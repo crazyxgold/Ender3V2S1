@@ -780,7 +780,6 @@ void unified_bed_leveling::shift_mesh_height(const float zoffs) {
       if (do_ubl_mesh_map) display_map(param.T_map_type);
 
       const grid_count_t point_num = (GRID_MAX_POINTS - count) + 1;
-      SERIAL_ECHOLNPGM("Probing mesh point ", point_num, "/", GRID_MAX_POINTS, ".");
       TERN_(HAS_STATUS_MESSAGE, ui.status_printf(0, F(S_FMT " %i/%i"), GET_TEXT(MSG_PROBING_POINT), point_num, int(GRID_MAX_POINTS)));
       TERN_(HAS_BACKLIGHT_TIMEOUT, ui.refresh_backlight_timeout());
 
@@ -813,7 +812,10 @@ void unified_bed_leveling::shift_mesh_height(const float zoffs) {
 
       if (best.pos.x >= 0) {    // mesh point found and is reachable by probe
         TERN_(EXTENSIBLE_UI, ExtUI::onMeshUpdate(best.pos, ExtUI::G29_POINT_START));
-        const float measured_z = probe.probe_at_point(best.meshpos(), stow_probe ? PROBE_PT_STOW : PROBE_PT_RAISE, param.V_verbosity);
+        const xy_pos_t mesh_point = best.meshpos();
+        SERIAL_ECHOLNPGM("Probing mesh point ", point_num, "/", GRID_MAX_POINTS,
+                         ". Bed X: ", mesh_point.x, " Y: ", mesh_point.y);
+        const float measured_z = probe.probe_at_point(mesh_point, stow_probe ? PROBE_PT_STOW : PROBE_PT_RAISE, param.V_verbosity);
         z_values[best.pos.x][best.pos.y] = isnan(measured_z) ? HUGE_VALF : measured_z;  // Mark invalid point already probed with HUGE_VALF to omit it in the next loop
         #if ENABLED(EXTENSIBLE_UI)
           ExtUI::onMeshUpdate(best.pos, ExtUI::G29_POINT_FINISH);
