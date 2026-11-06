@@ -47,6 +47,10 @@ public:
 
   static SerialState serial_state[NUM_SERIAL]; //!< Serial states for each serial port
 
+  #if ENABLED(DWIN_LCD_PROUI)
+    static uint8_t recent_host_ports(const millis_t now);
+  #endif
+
   /**
    * G-Code Command Queue
    * A simple (circular) ring buffer of BUFSIZE command strings.

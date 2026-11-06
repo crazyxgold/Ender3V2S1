@@ -105,7 +105,8 @@ enum processID : uint8_t {
   ID_Homing,
   ID_PIDProcess,
   ID_MPCProcess,
-  ID_NothingToDo
+  ID_NothingToDo,
+  ID_InfoProcess
 };
 
 #if HAS_PID_HEATING || ENABLED(MPC_AUTOTUNE)

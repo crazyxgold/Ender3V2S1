@@ -880,6 +880,25 @@ void dwinDrawDashboard() {
 
 }
 
+static void drawHostTraffic(const uint8_t ports) {
+  dwinDrawRectangle(1, hmiData.colorBackground, 0, 309, DWIN_WIDTH - 1, 332);
+  if (!ports) {
+    DWINUI::drawCenteredString(313, F("No recent host traffic"));
+    return;
+  }
+  char label[sizeof("Host traffic:") + 3 * NUM_SERIAL] = "Host traffic:";
+  char *out = label + sizeof("Host traffic:") - 1;
+  for (uint8_t p = 0; p < NUM_SERIAL; ++p) {
+    if (ports & _BV(p)) {
+      *out++ = ' ';
+      *out++ = 'P';
+      *out++ = '1' + p;
+    }
+  }
+  *out = '\0';
+  DWINUI::drawCenteredString(313, label);
+}
+
 void drawInfoMenu() {
   DWINUI::clearMainArea();
   title.draw(GET_TEXT_F(MSG_INFO_SCREEN));
@@ -911,7 +930,7 @@ void drawInfoMenu() {
     DWINUI::drawCenteredString(251, GET_TEXT_F(MSG_INFO_BUILD));
     DWINUI::drawCenteredString(271, F(dateTime));
   #endif
-
+  drawHostTraffic(queue.recent_host_ports(millis()));
 }
 
 // Main Process
@@ -962,6 +981,7 @@ void hmiMainMenu() {
 void drawMainArea() {
   switch (checkkey) {
     case ID_MainMenu:               drawMainMenu(); break;
+    case ID_InfoProcess:            drawInfoMenu(); break;
     case ID_PrintProcess:           printing.drawPrintProcess(); break;
     case ID_PrintDone:              printing.drawPrintDone(); break;
     #if HAS_ESDIAG
@@ -1057,6 +1077,15 @@ void eachMomentUpdate() {
   if (ELAPSED(ms, next_status_update_ms)) {
     next_status_update_ms = ms + 500;
     dwinDrawStatusMessage();
+    static uint8_t last_host_ports;
+    const uint8_t host_ports = queue.recent_host_ports(ms);
+    if (host_ports != last_host_ports) {
+      last_host_ports = host_ports;
+      if (checkkey == ID_InfoProcess) {
+        drawHostTraffic(host_ports);
+        dwinUpdateLCD();
+      }
+    }
     #if ENABLED(SCROLL_LONG_FILENAMES)
       if (isMenu(fileMenu)) fileMenuIdle();
     #endif
@@ -1165,6 +1194,7 @@ void dwinHandleScreen() {
     #endif
     case ID_PrintDone:
     TERN_(HAS_ESDIAG, case ID_ESDiagProcess:)
+    case ID_InfoProcess:
     case ID_WaitResponse:    hmiWaitForUser(); break;
     case ID_Homing:
     case ID_PIDProcess:
@@ -1176,6 +1206,7 @@ void dwinHandleScreen() {
 bool idIsPopUp() {    // If ID is popup...
   switch (checkkey) {
     case ID_NothingToDo:
+    case ID_InfoProcess:
     case ID_WaitResponse:
     case ID_Popup:
     case ID_Homing:
@@ -1194,6 +1225,7 @@ void hmiSaveProcessID(const uint8_t id) {
   checkkey = id;
   switch (id) {
     case ID_Popup:
+    case ID_InfoProcess:
     case ID_WaitResponse:
     case ID_PrintDone:
     case ID_Leveling:
@@ -1846,7 +1878,7 @@ void rebootPrinter() {
 void gotoInfoMenu() {
   drawInfoMenu();
   dwinUpdateLCD();
-  hmiSaveProcessID(ID_WaitResponse);
+  hmiSaveProcessID(ID_InfoProcess);
 }
 
 void disableMotors() { queue.inject(F("M84")); }

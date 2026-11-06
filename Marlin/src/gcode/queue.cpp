@@ -53,6 +53,18 @@ GCodeQueue queue;
 PGMSTR(G28_STR, "G28");
 
 GCodeQueue::SerialState GCodeQueue::serial_state[NUM_SERIAL] = { 0 };
+
+#if ENABLED(DWIN_LCD_PROUI)
+  static millis_t host_deadline[NUM_SERIAL];
+  static uint8_t host_ports;
+
+  uint8_t GCodeQueue::recent_host_ports(const millis_t now) {
+    for (uint8_t p = 0; p < NUM_SERIAL; ++p)
+      if ((host_ports & _BV(p)) && ELAPSED(now, host_deadline[p]))
+        host_ports &= ~_BV(p);
+    return host_ports;
+  }
+#endif
 GCodeQueue::RingBuffer GCodeQueue::ring_buffer = { 0 };
 
 #if NO_TIMEOUTS > 0
@@ -548,6 +560,10 @@ void GCodeQueue::get_serial_commands() {
 
         // Add the command to the queue
         ring_buffer.enqueue(serial.line_buffer, false OPTARG(HAS_MULTI_SERIAL, p));
+        #if ENABLED(DWIN_LCD_PROUI)
+          host_deadline[p] = millis() + 30000UL;
+          host_ports |= _BV(p);
+        #endif
       }
       else
         process_stream_char(serial_char, serial.input_state, serial.line_buffer, serial.count);
