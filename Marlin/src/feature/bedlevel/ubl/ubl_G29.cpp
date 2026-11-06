@@ -773,6 +773,7 @@ void unified_bed_leveling::shift_mesh_height(const float zoffs) {
 
     save_ubl_active_state_and_disable();  // No bed level correction so only raw data is obtained
     grid_count_t count = GRID_MAX_POINTS;
+    grid_count_t measured_count = 0, failed_count = 0;
 
     mesh_index_pair best;
     TERN_(EXTENSIBLE_UI, ExtUI::onMeshUpdate(best.pos, ExtUI::G29_START));
@@ -816,7 +817,9 @@ void unified_bed_leveling::shift_mesh_height(const float zoffs) {
         SERIAL_ECHOLNPGM("Probing mesh point ", point_num, "/", GRID_MAX_POINTS,
                          ". Bed X: ", mesh_point.x, " Y: ", mesh_point.y);
         const float measured_z = probe.probe_at_point(mesh_point, stow_probe ? PROBE_PT_STOW : PROBE_PT_RAISE, param.V_verbosity);
-        z_values[best.pos.x][best.pos.y] = isnan(measured_z) ? HUGE_VALF : measured_z;  // Mark invalid point already probed with HUGE_VALF to omit it in the next loop
+        const bool failed = isnan(measured_z);
+        z_values[best.pos.x][best.pos.y] = failed ? HUGE_VALF : measured_z;  // Mark invalid point already probed with HUGE_VALF to omit it in the next loop
+        if (failed) ++failed_count; else ++measured_count;
         #if ENABLED(EXTENSIBLE_UI)
           ExtUI::onMeshUpdate(best.pos, ExtUI::G29_POINT_FINISH);
           ExtUI::onMeshUpdate(best.pos, measured_z);
@@ -827,7 +830,12 @@ void unified_bed_leveling::shift_mesh_height(const float zoffs) {
 
     } while (best.pos.x >= 0 && --count);
 
-    GRID_LOOP(x, y) if (z_values[x][y] == HUGE_VALF) z_values[x][y] = NAN; // Restore NAN for HUGE_VALF marks
+    grid_count_t missing_count = 0;
+    GRID_LOOP(x, y) {
+      float &z = z_values[x][y];
+      if (z == HUGE_VALF) z = NAN; // Restore NAN for HUGE_VALF marks
+      if (isnan(z)) ++missing_count;
+    }
 
     TERN_(EXTENSIBLE_UI, ExtUI::onMeshUpdate(best.pos, ExtUI::G29_FINISH));
 
@@ -839,6 +847,11 @@ void unified_bed_leveling::shift_mesh_height(const float zoffs) {
     probe.move_z_after_probing();
 
     restore_ubl_active_state_and_leave();
+
+    // This is a summary of the probe pass, before any estimated points are filled in.
+    SERIAL_ECHOLNPGM("UBL probe result before fill: measured ", measured_count,
+                     ", failed ", failed_count, ", missing ", missing_count,
+                     ", retained ", int(GRID_MAX_POINTS) - measured_count - missing_count);
 
     #if PROUI_EX
       bedlevel.smart_fill_mesh();
