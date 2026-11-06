@@ -926,10 +926,12 @@ void MarlinSettings::postprocess() {
     #endif
     static_assert(sizeof(SettingsData) == 496, "Unexpected S1 F1 EEPROM record size");
     static_assert(version_str[0] == 'A' && version_str[1] == '9' && version_str[2] == '0', "Unexpected S1 F1 EEPROM version");
-    constexpr uint32_t s1_f1_20260106_build_hash = 0x223F5126UL;
   #endif
 
-  #if ENABLED(EEPROM_INIT_NOW)
+  #if defined(S1_F1_20260106_RETAIN_EEPROM)
+    // Keep both reads and writes compatible with the verified recovery image.
+    constexpr uint32_t build_hash = 0x223F5126UL;
+  #elif ENABLED(EEPROM_INIT_NOW)
     constexpr uint32_t strhash32(const char *s, const uint32_t h=0) {
       return *s ? strhash32(s + 1, ((h + *s) << (*s & 3)) ^ *s) : h;
     }
@@ -2073,11 +2075,7 @@ void MarlinSettings::postprocess() {
       #if ENABLED(EEPROM_INIT_NOW)
         uint32_t stored_hash;
         EEPROM_READ_ALWAYS(stored_hash);
-        if (stored_hash != build_hash
-          #if defined(S1_F1_20260106_RETAIN_EEPROM)
-            && stored_hash != s1_f1_20260106_build_hash
-          #endif
-        ) {
+        if (stored_hash != build_hash) {
           eeprom_error = ERR_EEPROM_CORRUPT;
           break;
         }
@@ -3356,7 +3354,6 @@ void MarlinSettings::postprocess() {
     // Options to overwrite the EEPROM on error
     #if defined(S1_F1_20260106_RETAIN_EEPROM)
       SERIAL_ECHO_MSG("EEPROM validation failed; stored settings left unchanged.");
-      LCD_MESSAGE_F("EEPROM check failed");
     #elif ANY(EEPROM_AUTO_INIT, EEPROM_INIT_NOW)
       (void)init_eeprom();
       LCD_MESSAGE(MSG_EEPROM_INITIALIZED);
