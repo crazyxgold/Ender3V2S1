@@ -920,7 +920,18 @@ void MarlinSettings::postprocess() {
 
   constexpr char version_str[4] = EEPROM_VERSION;
 
-  #if ENABLED(EEPROM_INIT_NOW)
+  #if defined(S1_F1_20260106_RETAIN_EEPROM)
+    #if !MB(CREALITY_V24S1_301) || !defined(STM32F1xx) || !PROUI_EX || !ENABLED(EEPROM_INIT_NOW)
+      #error "S1 F1 retention requires the matching 20260106 ProUI EEPROM layout."
+    #endif
+    static_assert(sizeof(SettingsData) == 496, "Unexpected S1 F1 EEPROM record size");
+    static_assert(version_str[0] == 'A' && version_str[1] == '9' && version_str[2] == '0', "Unexpected S1 F1 EEPROM version");
+  #endif
+
+  #if defined(S1_F1_20260106_RETAIN_EEPROM)
+    // Keep both reads and writes compatible with the verified recovery image.
+    constexpr uint32_t build_hash = 0x223F5126UL;
+  #elif ENABLED(EEPROM_INIT_NOW)
     constexpr uint32_t strhash32(const char *s, const uint32_t h=0) {
       return *s ? strhash32(s + 1, ((h + *s) << (*s & 3)) ^ *s) : h;
     }
@@ -2040,7 +2051,13 @@ void MarlinSettings::postprocess() {
     EEPROM_Error eeprom_error = ERR_EEPROM_NOERR;
 
     const EEPROM_Error check = check_version();
-    if (check == ERR_EEPROM_NOPROM) return eeprom_error;
+    if (check == ERR_EEPROM_NOPROM) {
+      #if defined(S1_F1_20260106_RETAIN_EEPROM)
+        return check;         // A failed EEPROM access must not pass validation.
+      #else
+        return eeprom_error;  // Keep upstream behavior for other build profiles.
+      #endif
+    }
 
     uint16_t stored_crc;
 
@@ -3335,7 +3352,9 @@ void MarlinSettings::postprocess() {
     reset();
 
     // Options to overwrite the EEPROM on error
-    #if ANY(EEPROM_AUTO_INIT, EEPROM_INIT_NOW)
+    #if defined(S1_F1_20260106_RETAIN_EEPROM)
+      SERIAL_ECHO_MSG("EEPROM validation failed; stored settings left unchanged.");
+    #elif ANY(EEPROM_AUTO_INIT, EEPROM_INIT_NOW)
       (void)init_eeprom();
       LCD_MESSAGE(MSG_EEPROM_INITIALIZED);
       SERIAL_ECHO_MSG(STR_EEPROM_INITIALIZED);

@@ -1215,6 +1215,9 @@ void setup() {
     #endif
   #endif
   SERIAL_ECHOLNPGM("start");
+  #ifdef S1_F1_20260106_RETAIN_EEPROM
+    SERIAL_ECHOLNPGM("S1F1 R2: serial ready");
+  #endif
 
   // Set up these pins early to prevent suicide
   #if HAS_KILL
@@ -1391,8 +1394,14 @@ void setup() {
     const millis_t bootscreen_ms = millis();
   #endif
 
+  #ifdef S1_F1_20260106_RETAIN_EEPROM
+    SERIAL_ECHOLNPGM("S1F1 R2: loading settings");
+  #endif
   SETUP_RUN(settings.first_load());   // Load data from EEPROM if available (or use defaults)
                                       // This also updates variables in the planner, elsewhere
+  #ifdef S1_F1_20260106_RETAIN_EEPROM
+    SERIAL_ECHOLNPGM("S1F1 R2: settings loaded");
+  #endif
 
   #if ENABLED(CONFIGURABLE_MACHINE_NAME)
     SETUP_RUN(ui.reset_status(false)); // machine_name Initialized by settings.load()
